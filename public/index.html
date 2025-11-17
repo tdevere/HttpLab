@@ -301,7 +301,13 @@
             </div>
 
             <div id="lab-status" style="text-align: center; font-size: 1.05em; color: #333; margin-bottom: 10px;"></div>
-            <p style="text-align: center; font-size: 0.9em; color: #555;">Use the Learning Lab to get the overview, then scroll down to explore each stop in detail.</p>
+
+            <div id="lab-errors" style="max-width: 900px; margin: 0 auto; font-size: 0.9em; color: #333;">
+                <div style="text-align: center; margin-bottom: 8px; font-weight: 600;">Common issues at this stage</div>
+                <ul id="lab-errors-list" style="list-style: none; padding-left: 0; margin: 0;"></ul>
+            </div>
+
+            <p style="text-align: center; font-size: 0.9em; color: #555; margin-top: 12px;">Use the Learning Lab to get the overview, then scroll down to explore each stop in detail.</p>
         </div>
 
         <div class="osi-primer">
@@ -416,12 +422,7 @@
             </div>
         </div>
 
-        <div class="details show" id="details-panel">
-            <h3>Welcome! 👋</h3>
-            <p>This interactive tutorial will guide you through the complete process of establishing a secure HTTPS connection.</p>
-            <p><strong>Click on any stop above</strong> to see the detailed breakdown of what happens at that stage, including its correlation to the OSI Model!</p>
-            <p>Each step builds upon the previous one, creating a secure, encrypted channel for your web browsing.</p>
-        </div>
+        <div class="details" id="details-panel"></div>
 
         <div class="button-row">
             <button class="test-button" onclick="testConnection()" id="primary-action-button">🧪 Test HTTPS Connection</button>
@@ -430,6 +431,153 @@
     </div>
 
     <script>
+        const errorScenarios = [
+            {
+                stopIndex: 0,
+                stage: "Application Request",
+                errors: [
+                    {
+                        code: "ERR_INVALID_URL",
+                        message: "The requested URL is not valid.",
+                        cause: "The browser request was made with a malformed or incomplete URL.",
+                        hint: "Check for typos in the URL (protocol, host, path)."
+                    }
+                ]
+            },
+            {
+                stopIndex: 1,
+                stage: "DNS Lookup",
+                errors: [
+                    {
+                        code: "DNS_PROBE_FINISHED_NXDOMAIN",
+                        message: "Server IP address could not be found.",
+                        cause: "The domain does not exist in DNS or was typed incorrectly.",
+                        hint: "Verify the hostname and ensure the DNS record exists and has propagated."
+                    },
+                    {
+                        code: "ENOTFOUND",
+                        message: "getaddrinfo ENOTFOUND example.com",
+                        cause: "The operating system resolver could not resolve the hostname.",
+                        hint: "Confirm local DNS settings and that the DNS server is reachable."
+                    }
+                ]
+            },
+            {
+                stopIndex: 2,
+                stage: "TCP Handshake",
+                errors: [
+                    {
+                        code: "ERR_CONNECTION_REFUSED",
+                        message: "The connection was refused by the server.",
+                        cause: "Nothing is listening on the target port or a firewall is actively rejecting the connection.",
+                        hint: "Ensure the server process is running and listening on the expected port."
+                    },
+                    {
+                        code: "ECONNREFUSED",
+                        message: "connect ECONNREFUSED 127.0.0.1:8443",
+                        cause: "The client reached the host but the TCP port is closed.",
+                        hint: "Start the HTTPS server (for this lab, run 'npm start') and retry."
+                    },
+                    {
+                        code: "ERR_CONNECTION_TIMED_OUT",
+                        message: "The connection to the server timed out.",
+                        cause: "Packets are being dropped on the network path or the server is overloaded.",
+                        hint: "Check network connectivity, VPNs, and firewall rules between client and server."
+                    }
+                ]
+            },
+            {
+                stopIndex: 3,
+                stage: "TLS ClientHello",
+                errors: [
+                    {
+                        code: "handshake_failure",
+                        message: "TLS handshake failed during ClientHello.",
+                        cause: "The client and server could not agree on protocol version or cipher suites.",
+                        hint: "Ensure the server supports modern TLS versions and compatible cipher suites."
+                    }
+                ]
+            },
+            {
+                stopIndex: 4,
+                stage: "TLS ServerHello",
+                errors: [
+                    {
+                        code: "TLSV1_ALERT_PROTOCOL_VERSION",
+                        message: "Received TLS alert: protocol version.",
+                        cause: "The server rejected the client's TLS version as too old or unsupported.",
+                        hint: "Upgrade the client to use TLS 1.2+ and disable legacy protocols."
+                    }
+                ]
+            },
+            {
+                stopIndex: 5,
+                stage: "Certificate Verification",
+                errors: [
+                    {
+                        code: "NET::ERR_CERT_AUTHORITY_INVALID",
+                        message: "Your connection is not private.",
+                        cause: "The certificate is self-signed or issued by an untrusted certificate authority.",
+                        hint: "For this lab, you can proceed after reviewing the warning; in production, use a trusted CA."
+                    },
+                    {
+                        code: "NET::ERR_CERT_COMMON_NAME_INVALID",
+                        message: "The certificate does not match this host.",
+                        cause: "The certificate's common name or SAN does not match the requested hostname.",
+                        hint: "Confirm that the URL hostname matches the certificate's subject (or SAN) exactly."
+                    },
+                    {
+                        code: "NET::ERR_CERT_DATE_INVALID",
+                        message: "Certificate has expired or is not yet valid.",
+                        cause: "The certificate's validity period does not include the current date.",
+                        hint: "Check system clock and renew or regenerate the certificate if necessary."
+                    }
+                ]
+            },
+            {
+                stopIndex: 6,
+                stage: "Key Exchange",
+                errors: [
+                    {
+                        code: "SSL_ERROR_HANDSHAKE_FAILURE_ALERT",
+                        message: "TLS key exchange failed.",
+                        cause: "The server rejected the key exchange parameters (e.g., unsupported ECDHE curve).",
+                        hint: "Ensure both client and server support the same key exchange algorithms and parameter sizes."
+                    }
+                ]
+            },
+            {
+                stopIndex: 7,
+                stage: "Shared Secret Derivation",
+                errors: [
+                    {
+                        code: "DECRYPT_ERROR",
+                        message: "TLS decryption failed during Finished message.",
+                        cause: "The derived keys do not match between client and server.",
+                        hint: "Check for middleboxes modifying handshake traffic or misconfigured TLS offload."
+                    }
+                ]
+            },
+            {
+                stopIndex: 8,
+                stage: "Encrypted Data Transfer",
+                errors: [
+                    {
+                        code: "Mixed Content",
+                        message: "The page was loaded over HTTPS, but requested an insecure resource over HTTP.",
+                        cause: "Some assets (scripts, images, APIs) are still referenced with http:// URLs.",
+                        hint: "Update asset URLs to https:// or use protocol-relative URLs when appropriate."
+                    },
+                    {
+                        code: "502 Bad Gateway",
+                        message: "The server received an invalid response from an upstream server.",
+                        cause: "TLS terminated correctly at a reverse proxy, but the backend application failed or is unreachable.",
+                        hint: "Inspect reverse proxy and backend logs to see why upstream failed to respond."
+                    }
+                ]
+            }
+        ];
+
         const stepsData = [
             {
                 title: "Stop 1: The Request (Application Layer)",
@@ -482,6 +630,17 @@ Protocol: UDP/TCP on port 53
                     </div>
 
                     <p><strong>Fun Fact:</strong> DNS queries are typically sent over <span class="highlight">UDP</span> for speed, but can use TCP for larger responses or zone transfers.</p>
+
+                    <h4 style="margin-top: 20px;">🖥️ Windows vs macOS vs Linux: Where does the IP come from?</h4>
+                    <p>All three operating systems follow the same high-level pattern: <span class="highlight">check local overrides</span>, then <span class="highlight">ask a DNS server</span>. The details differ slightly:</p>
+
+                    <ul>
+                        <li><strong>Windows:</strong> Checks <code>C:\\Windows\\System32\\drivers\\etc\\hosts</code> first. Then it uses DNS servers configured on your network adapters or VPN. You can inspect or flush the DNS cache with <code>ipconfig /displaydns</code> and <code>ipconfig /flushdns</code>.</li>
+                        <li><strong>macOS:</strong> Checks <code>/etc/hosts</code> first. DNS servers are configured in Network settings or via management profiles. DNS caching is handled by <code>mDNSResponder</code> (you can refresh it with <code>sudo killall -HUP mDNSResponder</code>).</li>
+                        <li><strong>Linux:</strong> Also checks <code>/etc/hosts</code> first. DNS servers usually come from <code>/etc/resolv.conf</code> or <code>systemd-resolved</code>. Tools like <code>dig</code>, <code>host</code>, and <code>resolvectl</code> help you see exactly which IP was returned.</li>
+                    </ul>
+
+                    <p>In every case, once an IP address is found, the rest of the HTTPS journey (TCP handshake, TLS, and encrypted HTTP) works the same way.</p>
                 `
             },
             {
@@ -795,6 +954,7 @@ Cannot determine:
         const labPlayButton = document.getElementById('lab-play-button');
         const labPauseButton = document.getElementById('lab-pause-button');
         const labStatus = document.getElementById('lab-status');
+        const labErrorsList = document.getElementById('lab-errors-list');
 
         stops.forEach((stop, index) => {
             stop.addEventListener('click', () => {
@@ -905,9 +1065,23 @@ Cannot determine:
                 labStatus.innerHTML = `<strong>Current Stop:</strong> ${stepsData[index].title}`;
             }
 
-            // When used from the Lab, we keep the viewport here at the top
-            // and only update the Lab status text. We no longer auto-scroll
-            // into the main Terminal Map details when autoplay is running.
+            // Update Common Issues panel for this stage
+            if (labErrorsList) {
+                labErrorsList.innerHTML = '';
+                const scenario = errorScenarios.find(e => e.stopIndex === index);
+                if (scenario && Array.isArray(scenario.errors)) {
+                    scenario.errors.forEach(err => {
+                        const li = document.createElement('li');
+                        li.style.marginBottom = '6px';
+                        li.innerHTML = `
+                            <strong>${err.code}</strong> – ${err.message}<br/>
+                            <span style="color:#555;">Cause:</span> ${err.cause}<br/>
+                            <span style="color:#555;">Hint:</span> ${err.hint}
+                        `;
+                        labErrorsList.appendChild(li);
+                    });
+                }
+            }
         }
 
         function startLabAutoPlay() {
