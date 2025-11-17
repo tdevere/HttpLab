@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+npm-debug.log*
+package-lock.json
+
+# Certificates (regenerate locally)
+certs/
+
+# Operating System Files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+logs/
+*.log
+
+# Environment variables
+.env
+.env.local
